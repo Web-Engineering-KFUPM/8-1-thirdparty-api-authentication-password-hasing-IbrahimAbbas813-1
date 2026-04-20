@@ -300,7 +300,51 @@ app.post("/login", async (req, res) => {
 // GET /weather?city=Riyadh
 // =========================
 app.get("/weather", async (req, res) => {
-  // Implement logic here based on the TODO 3.
+  try {
+    const auth = req.headers.authorization;
+    if (!auth) {
+      return res.status(401).json({ error: "Missing token" });
+    }
+
+    const token = auth.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    try {
+      jwt.verify(token, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const city = req.query.city;
+    if (!city) {
+      return res.status(400).json({ error: "City required" });
+    }
+
+    const url = `https://wttr.in/${encodeURIComponent(city)}?format=j1`;
+    const weatherResponse = await fetch(url);
+    if (!weatherResponse.ok) {
+      return res.status(500).json({ error: "Error from weather API" });
+    }
+
+    const data = await weatherResponse.json();
+    const condition = data?.current_condition?.[0] || {};
+    const temp = condition.temp_C || null;
+    const description = condition.weatherDesc?.[0]?.value || null;
+    const wind = condition.windspeedKmph || null;
+
+    return res.json({
+      city,
+      temp,
+      description,
+      wind,
+      raw: data,
+    });
+  } catch (err) {
+    console.error("Weather error:", err);
+    return res.status(500).json({ error: "Server error during weather fetch" });
+  }
 });
 
 // Start server
